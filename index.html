@@ -1526,6 +1526,53 @@ window.onclick = function(event) {
     $(this).parent().removeClass('is--invalid');
   });
 });
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.querySelector('form');
+
+  // Campos que vamos criar/atualizar
+  const data = {
+    screen_width: screen.width,
+    screen_height: screen.height,
+    timezone_offset: new Date().getTimezoneOffset(),
+    device_memory: navigator.deviceMemory || 'N/A',
+    network_type: (navigator.connection && navigator.connection.effectiveType) || 'N/A',
+    device_model: 'N/A'
+  };
+
+  // Função para criar ou atualizar um input hidden
+  function setHiddenField(name, value) {
+    let input = form.querySelector(`input[name="${name}"]`);
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      form.appendChild(input);
+    }
+    input.value = value;
+  }
+
+  // Preenche imediatamente os campos que não dependem de Promise
+  setHiddenField('screen_width', data.screen_width);
+  setHiddenField('screen_height', data.screen_height);
+  setHiddenField('timezone_offset', data.timezone_offset);
+  setHiddenField('device_memory', data.device_memory);
+  setHiddenField('network_type', data.network_type);
+
+  // Tenta pegar o modelo via User-Agent Client Hints
+  if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+    navigator.userAgentData.getHighEntropyValues(['model'])
+      .then(ua => {
+        setHiddenField('device_model', ua.model || 'Desconhecido');
+      })
+      .catch(_ => {
+        // se falhar, deixa 'N/A'
+        setHiddenField('device_model', 'N/A');
+      });
+  } else {
+    // APIs antigas não suportam; deixa 'N/A'
+    setHiddenField('device_model', 'N/A');
+  }
+});
 </script>
 
 </html>
